@@ -83,33 +83,21 @@ def get_json(session: requests.Session, url: str, retries: int = 5) -> dict:
 def load_sp500() -> pd.DataFrame:
     df = pd.read_csv(SP500_GITHUB_CSV)
     symbol_col = "Symbol" if "Symbol" in df.columns else "symbol"
-    name_col = "Name" if "Name" in df.columns else ("Security" if "Security" in df.columns else None)
+    name_col = "Security" if "Security" in df.columns else ("Name" if "Name" in df.columns else None)
+    cik_col = "CIK" if "CIK" in df.columns else None
+    if cik_col is None:
+        raise RuntimeError("The S&P 500 GitHub dataset does not contain a CIK column.")
+
     out = pd.DataFrame({
         "ticker": df[symbol_col].astype(str).str.upper().str.replace(".", "-", regex=False),
+        "cik": pd.to_numeric(df[cik_col], errors="coerce"),
     })
     if name_col:
         out["constituent_name"] = df[name_col].astype(str)
-    return out.drop_duplicates("ticker")
+    out = out.dropna(subset=["cik"]).copy()
+    out["cik"] = out["cik"].astype(int)
+    return out.drop_duplicates(["ticker", "cik"])
 
-def load_sec_ticker_map() -> pd.DataFrame:
-    ua = os.getenv("SEC_USER_AGENT", "").strip()
-    if not ua:
-        raise RuntimeError("SEC_USER_AGENT is required.")
-    r = requests.get(
-        SEC_TICKERS_URL,
-        headers={"User-Agent": ua, "Accept-Encoding": "gzip, deflate"},
-        timeout=60,
-    )
-    r.raise_for_status()
-    raw = r.json()
-    rows = []
-    for _, v in raw.items():
-        rows.append({
-            "cik": int(v["cik_str"]),
-            "ticker": str(v["ticker"]).upper().replace(".", "-"),
-            "sec_title": v["title"],
-        })
-    return pd.DataFrame(rows).drop_duplicates("ticker")
 
 def filing_metadata(session: requests.Session, cik: int) -> dict:
     d = get_json(session, SEC_SUBMISSIONS.format(cik=cik))
@@ -240,9 +228,7 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     sec = make_session()
 
-    sp = load_sp500()
-    mp = load_sec_ticker_map()
-    universe = sp.merge(mp, on="ticker", how="inner")
+    universe = load_sp500()
 
     metadata_rows = []
     panel_parts = []
