@@ -1,0 +1,56 @@
+name: Collect SEC panel
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_year:
+        description: "First fiscal year"
+        required: true
+        default: "2010"
+      end_year:
+        description: "Last fiscal year"
+        required: true
+        default: "2025"
+      max_firms:
+        description: "Maximum eligible firms (test with 25; then use 300-500)"
+        required: true
+        default: "300"
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Collect SEC panel
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+        run: |
+          python src/collect_sec_panel.py \
+            --start-year "${{ inputs.start_year }}" \
+            --end-year "${{ inputs.end_year }}" \
+            --max-firms "${{ inputs.max_firms }}" \
+            --outdir data
+
+      - name: Upload data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-panel-data
+          path: |
+            data/sec_financial_panel.csv
+            data/sec_firm_metadata.csv
+            data/sec_missingness_report.csv
+            data/sec_collection_log.csv
+          retention-days: 30
