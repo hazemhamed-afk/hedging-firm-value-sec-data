@@ -1,6 +1,12 @@
 name: Collect SEC panel
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "requirements.txt"
+      - ".github/workflows/collect-sec-data.yml"
   workflow_dispatch:
     inputs:
       start_year:
@@ -14,7 +20,7 @@ on:
       max_firms:
         description: "Maximum eligible firms (test with 25; then use 300-500)"
         required: true
-        default: "300"
+        default: "25"
 
 jobs:
   collect:
@@ -36,12 +42,19 @@ jobs:
 
       - name: Collect SEC panel
         env:
-          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          SEC_USER_AGENT: "hazemhamed-afk@users.noreply.github.com academic research"
         run: |
+          START_YEAR="${{ inputs.start_year }}"
+          END_YEAR="${{ inputs.end_year }}"
+          MAX_FIRMS="${{ inputs.max_firms }}"
+          if [ -z "$START_YEAR" ]; then START_YEAR="2010"; fi
+          if [ -z "$END_YEAR" ]; then END_YEAR="2025"; fi
+          if [ -z "$MAX_FIRMS" ]; then MAX_FIRMS="25"; fi
+
           python src/collect_sec_panel.py \
-            --start-year "${{ inputs.start_year }}" \
-            --end-year "${{ inputs.end_year }}" \
-            --max-firms "${{ inputs.max_firms }}" \
+            --start-year "$START_YEAR" \
+            --end-year "$END_YEAR" \
+            --max-firms "$MAX_FIRMS" \
             --outdir data
 
       - name: Upload data artifact
