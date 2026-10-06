@@ -67,15 +67,15 @@ def make_session() -> requests.Session:
     })
     return s
 
-def get_json(session: requests.Session, url: str, retries: int = 5) -> dict:
+def get_json(session: requests.Session, url: str, retries: int = 2) -> dict:
     delay = 0.15
     for attempt in range(retries):
-        r = session.get(url, timeout=60)
+        r = session.get(url, timeout=10)
         if r.status_code == 200:
             time.sleep(delay)
             return r.json()
         if r.status_code in (403, 429, 500, 502, 503, 504):
-            time.sleep((attempt + 1) * 2)
+            time.sleep(attempt + 1)
             continue
         r.raise_for_status()
     raise RuntimeError(f"Failed after {retries} attempts: {url}")
